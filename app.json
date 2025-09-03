@@ -1,0 +1,60 @@
+{
+  "expo": {
+    "name": "GlobeMoments",
+    "slug": "GlobeMoments",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "scheme": "globemoments",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "extra": {
+      "FIREBASE_API_KEY": "AIzaSyBpnfEV42t3Yxzy3TZ4BNt_37wLJ5dGJgs",
+      "FIREBASE_AUTH_DOMAIN": "globemoments-75623.firebaseapp.com",
+      "FIREBASE_PROJECT_ID": "globemoments-75623",
+      "FIREBASE_STORAGE_BUCKET": "globemoments-75623.firebasestorage.app",
+      "FIREBASE_MESSAGING_SENDER_ID": "1053467320463",
+      "FIREBASE_APP_ID": "1:1053467320463:web:1f8a91a315eedef9fe90fa",
+      "FIREBASE_MEASUREMENT_ID": "G-LM31NTKQ9Y"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSCameraUsageDescription": "Cette app utilise la caméra pour prendre des photos de vos voyages.",
+        "NSLocationWhenInUseUsageDescription": "Cette app utilise votre position pour géolocaliser vos photos."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      },
+      "edgeToEdgeEnabled": true,
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION"
+      ]
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "static",
+  "favicon": "./assets/images/favicon.png"
+    },
+    "plugins": [
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#007AFF",
+          "image": "./assets/images/icon.png",
+          "imageWidth": 150,
+          "resizeMode": "contain"
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}
