@@ -1,0 +1,13 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /photos/{allPaths=**} {
+      // Règles complètement ouvertes pour les tests
+      allow read, write: if true;
+    }
+    match /{allPaths=**} {
+      // Règles complètement ouvertes pour les tests
+      allow read, write: if true;
+    }
+  }
+}

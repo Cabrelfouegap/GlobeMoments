@@ -28,21 +28,74 @@ const storage = getStorage(app);
 
 // Helper pour uploader une image
 export async function uploadImageAsync(uri, path = 'photos') {
-  const response = await fetch(uri);
-  const blob = await response.blob();
-  const storageRef = ref(storage, `${path}/${Date.now()}`);
-  await uploadBytes(storageRef, blob);
-  return await getDownloadURL(storageRef);
+  try {
+    console.log('🔄 Début upload Firebase Storage:', uri);
+
+    const response = await fetch(uri);
+    const blob = await response.blob();
+
+    console.log('📦 Blob créé, taille:', blob.size);
+
+    const storageRef = ref(storage, `${path}/${Date.now()}`);
+    console.log('📁 Référence storage créée:', storageRef.fullPath);
+
+    const uploadResult = await uploadBytes(storageRef, blob);
+    console.log('✅ Upload réussi:', uploadResult);
+
+    const downloadURL = await getDownloadURL(storageRef);
+    console.log('🔗 URL de téléchargement obtenue:', downloadURL);
+
+    return downloadURL;
+  } catch (error) {
+    console.error('❌ Erreur upload Firebase:', error);
+    throw error;
+  }
 }
 
 // Helper pour créer un document photo
 export async function createPhotoDocument({ imageUrl, coords, userId }) {
-  await addDoc(collection(db, 'photos'), {
-    imageUrl,
-    coords,
-    userId,
-    date: serverTimestamp(),
-  });
+  try {
+    console.log('💾 Début création document Firestore:', { imageUrl, coords, userId });
+
+    const docRef = await addDoc(collection(db, 'photos'), {
+      imageUrl,
+      coords,
+      userId,
+      date: serverTimestamp(),
+    });
+
+    console.log('✅ Document créé avec ID:', docRef.id);
+    return docRef;
+  } catch (error) {
+    console.error('❌ Erreur création document Firestore:', error);
+    throw error;
+  }
 }
 
 export { auth, db, storage };
+
+// Fonction de test pour vérifier la connexion Firebase
+export async function testFirebaseConnection() {
+  try {
+    console.log('🧪 Test de connexion Firebase...');
+
+    // Test Firestore
+    const testDoc = await addDoc(collection(db, 'test'), {
+      test: true,
+      timestamp: serverTimestamp(),
+    });
+    console.log('✅ Firestore fonctionne, document test créé:', testDoc.id);
+
+    // Test Storage (créer une référence)
+    const testStorageRef = ref(storage, 'test/test.txt');
+    console.log('✅ Storage fonctionne, référence créée:', testStorageRef.fullPath);
+
+    // Nettoyer le document de test
+    // await deleteDoc(testDoc); // On laisse pour le moment pour vérifier
+
+    return { success: true, message: 'Firebase fonctionne correctement' };
+  } catch (error) {
+    console.error('❌ Erreur de connexion Firebase:', error);
+    return { success: false, message: error.message, error };
+  }
+}
