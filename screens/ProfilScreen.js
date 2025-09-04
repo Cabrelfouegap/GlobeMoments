@@ -4,7 +4,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Alert, Image, ScrollView, TextInput, Modal } from 'react-native';
 import { useAuth } from '../services/auth';
 import { Ionicons } from '@expo/vector-icons';
-import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../services/firebase';
 import { normalizeUserData, ensureUserDocument, normalizeDate } from '../utils/userUtils';
 import * as ImagePicker from 'expo-image-picker';
@@ -17,10 +17,19 @@ export default function ProfilScreen() {
   const [editName, setEditName] = useState('');
   const [updating, setUpdating] = useState(false);
 
+  // État pour les vraies statistiques
+  const [realStats, setRealStats] = useState({
+    totalPhotos: 0,
+    photosThisMonth: 0,
+    photosThisWeek: 0,
+    totalLocations: 0,
+  });
+
   // États pour les nouveaux modals
   const [passwordModalVisible, setPasswordModalVisible] = useState(false);
   const [emailModalVisible, setEmailModalVisible] = useState(false);
   const [avatarModalVisible, setAvatarModalVisible] = useState(false);
+  const [nameModalVisible, setNameModalVisible] = useState(false);
 
   // États pour les formulaires
   const [currentPassword, setCurrentPassword] = useState('');
@@ -57,11 +66,68 @@ export default function ProfilScreen() {
     }
   }, [user]);
 
+  const loadRealStatistics = useCallback(async () => {
+    if (!user) return;
+
+    try {
+      console.log('📊 Chargement des vraies statistiques pour:', user.uid);
+
+      // Récupérer toutes les photos actives de l'utilisateur
+      const photosQuery = query(
+        collection(db, 'photos'),
+        where('userId', '==', user.uid),
+        where('isActive', '==', true)
+      );
+      const photosSnapshot = await getDocs(photosQuery);
+      const photos = photosSnapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          ...data,
+          date: data.createdAt?.toDate ? data.createdAt.toDate() : new Date(data.createdAt || data.date),
+        };
+      });
+
+      // Calculer les vraies statistiques
+      const now = new Date();
+      const thisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      const thisWeek = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+
+      const photosThisMonth = photos.filter(photo => photo.date >= thisMonth).length;
+      const photosThisWeek = photos.filter(photo => photo.date >= thisWeek).length;
+
+      // Compter les lieux uniques
+      const uniqueLocations = new Set(
+        photos
+          .filter(photo => photo.coords)
+          .map(photo => `${photo.coords.latitude.toFixed(2)},${photo.coords.longitude.toFixed(2)}`)
+      );
+
+      setRealStats({
+        totalPhotos: photos.length,
+        photosThisMonth,
+        photosThisWeek,
+        totalLocations: uniqueLocations.size,
+      });
+
+      console.log('✅ Statistiques mises à jour:', {
+        totalPhotos: photos.length,
+        photosThisMonth,
+        photosThisWeek,
+        totalLocations: uniqueLocations.size,
+      });
+
+    } catch (error) {
+      console.error('❌ Erreur lors du chargement des vraies statistiques:', error);
+    }
+  }, [user]);
+
   useEffect(() => {
     if (user) {
       loadUserData();
+      loadRealStatistics();
     }
-  }, [user, loadUserData]);
+  }, [user, loadUserData, loadRealStatistics]);
 
   if (!user) {
     return (
@@ -98,11 +164,10 @@ export default function ProfilScreen() {
   };
 
   const handleEditProfile = () => {
-    setEditName(userData?.name || user.displayName || '');
     setEditModalVisible(true);
   };
 
-  const handleSaveProfile = async () => {
+  const handleSaveName = async () => {
     if (!editName.trim()) {
       Alert.alert('Erreur', 'Le nom ne peut pas être vide');
       return;
@@ -117,11 +182,11 @@ export default function ProfilScreen() {
       });
 
       setUserData(prev => ({ ...prev, name: editName.trim() }));
-      setEditModalVisible(false);
-      Alert.alert('Succès', 'Profil mis à jour avec succès');
+      setNameModalVisible(false);
+      Alert.alert('Succès', 'Nom mis à jour avec succès');
     } catch (error) {
-      console.error('Erreur lors de la mise à jour du profil:', error);
-      Alert.alert('Erreur', 'Impossible de mettre à jour le profil');
+      console.error('Erreur lors de la mise à jour du nom:', error);
+      Alert.alert('Erreur', 'Impossible de mettre à jour le nom');
     } finally {
       setUpdating(false);
     }
@@ -252,23 +317,6 @@ export default function ProfilScreen() {
           <Ionicons name="pencil" size={16} color="#007AFF" />
           <Text style={styles.editButtonText}>Modifier le profil</Text>
         </TouchableOpacity>
-
-        <View style={styles.actionButtons}>
-          <TouchableOpacity style={styles.actionButton} onPress={() => setPasswordModalVisible(true)}>
-            <Ionicons name="key" size={16} color="#007AFF" />
-            <Text style={styles.actionButtonText}>Changer mot de passe</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.actionButton} onPress={() => setEmailModalVisible(true)}>
-            <Ionicons name="mail" size={16} color="#007AFF" />
-            <Text style={styles.actionButtonText}>Changer email</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.actionButton} onPress={() => setAvatarModalVisible(true)}>
-            <Ionicons name="camera" size={16} color="#007AFF" />
-            <Text style={styles.actionButtonText}>Changer avatar</Text>
-          </TouchableOpacity>
-        </View>
       </View>
 
       <View style={styles.statsBox}>
@@ -276,10 +324,25 @@ export default function ProfilScreen() {
         <View style={styles.statRow}>
           <Ionicons name="camera" size={24} color="#007AFF" />
           <Text style={styles.stats}>Photos sauvegardées</Text>
-          <Text style={styles.statsValue}>{userData?.photoCount || 0}</Text>
+          <Text style={styles.statsValue}>{realStats.totalPhotos}</Text>
         </View>
         <View style={styles.statRow}>
           <Ionicons name="calendar" size={24} color="#007AFF" />
+          <Text style={styles.stats}>Ce mois-ci</Text>
+          <Text style={styles.statsValue}>{realStats.photosThisMonth}</Text>
+        </View>
+        <View style={styles.statRow}>
+          <Ionicons name="time" size={24} color="#007AFF" />
+          <Text style={styles.stats}>Cette semaine</Text>
+          <Text style={styles.statsValue}>{realStats.photosThisWeek}</Text>
+        </View>
+        <View style={styles.statRow}>
+          <Ionicons name="map" size={24} color="#007AFF" />
+          <Text style={styles.stats}>Lieux visités</Text>
+          <Text style={styles.statsValue}>{realStats.totalLocations}</Text>
+        </View>
+        <View style={styles.statRow}>
+          <Ionicons name="person" size={24} color="#007AFF" />
           <Text style={styles.stats}>Membre depuis</Text>
           <Text style={styles.statsValue}>
             {userData?.createdAt ?
@@ -288,11 +351,11 @@ export default function ProfilScreen() {
             }
           </Text>
         </View>
-        <View style={styles.statRow}>
-          <Ionicons name="map" size={24} color="#007AFF" />
-          <Text style={styles.stats}>Lieux visités</Text>
-          <Text style={styles.statsValue}>0</Text>
-        </View>
+
+        <TouchableOpacity style={styles.refreshStatsButton} onPress={loadRealStatistics}>
+          <Ionicons name="refresh" size={16} color="#007AFF" />
+          <Text style={styles.refreshStatsText}>Actualiser les stats</Text>
+        </TouchableOpacity>
       </View>
 
       <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
@@ -330,31 +393,83 @@ export default function ProfilScreen() {
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Modifier le profil</Text>
 
-            <Text style={styles.inputLabel}>Nom d&apos;utilisateur</Text>
-            <TextInput
-              style={styles.textInput}
-              value={editName}
-              onChangeText={setEditName}
-              placeholder="Entrez votre nom"
-              maxLength={50}
-            />
+            <Text style={styles.modalSubtitle}>Choisissez ce que vous souhaitez modifier :</Text>
+
+            {/* Bouton modifier le nom */}
+            <TouchableOpacity
+              style={styles.editOptionButton}
+              onPress={() => {
+                setEditModalVisible(false);
+                setEditName(userData?.name || user.displayName || '');
+                setTimeout(() => setNameModalVisible(true), 300);
+              }}
+            >
+              <Ionicons name="person" size={24} color="#007AFF" />
+              <View style={styles.editOptionContent}>
+                <Text style={styles.editOptionTitle}>Nom d&apos;utilisateur</Text>
+                <Text style={styles.editOptionSubtitle}>
+                  {userData?.name || user.displayName || 'Non défini'}
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color="#ccc" />
+            </TouchableOpacity>
+
+            {/* Bouton changer mot de passe */}
+            <TouchableOpacity
+              style={styles.editOptionButton}
+              onPress={() => {
+                setEditModalVisible(false);
+                setTimeout(() => setPasswordModalVisible(true), 300);
+              }}
+            >
+              <Ionicons name="key" size={24} color="#007AFF" />
+              <View style={styles.editOptionContent}>
+                <Text style={styles.editOptionTitle}>Mot de passe</Text>
+                <Text style={styles.editOptionSubtitle}>••••••••</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color="#ccc" />
+            </TouchableOpacity>
+
+            {/* Bouton changer email */}
+            <TouchableOpacity
+              style={styles.editOptionButton}
+              onPress={() => {
+                setEditModalVisible(false);
+                setTimeout(() => setEmailModalVisible(true), 300);
+              }}
+            >
+              <Ionicons name="mail" size={24} color="#007AFF" />
+              <View style={styles.editOptionContent}>
+                <Text style={styles.editOptionTitle}>Adresse email</Text>
+                <Text style={styles.editOptionSubtitle}>{user.email}</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color="#ccc" />
+            </TouchableOpacity>
+
+            {/* Bouton changer avatar */}
+            <TouchableOpacity
+              style={styles.editOptionButton}
+              onPress={() => {
+                setEditModalVisible(false);
+                setTimeout(() => setAvatarModalVisible(true), 300);
+              }}
+            >
+              <Ionicons name="camera" size={24} color="#007AFF" />
+              <View style={styles.editOptionContent}>
+                <Text style={styles.editOptionTitle}>Photo de profil</Text>
+                <Text style={styles.editOptionSubtitle}>
+                  {user.photoURL ? 'Photo définie' : 'Aucune photo'}
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color="#ccc" />
+            </TouchableOpacity>
 
             <View style={styles.modalButtons}>
               <TouchableOpacity
                 style={[styles.modalButton, styles.cancelButton]}
                 onPress={() => setEditModalVisible(false)}
               >
-                <Text style={styles.cancelButtonText}>Annuler</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.modalButton, styles.saveButton]}
-                onPress={handleSaveProfile}
-                disabled={updating}
-              >
-                <Text style={styles.saveButtonText}>
-                  {updating ? 'Sauvegarde...' : 'Sauvegarder'}
-                </Text>
+                <Text style={styles.cancelButtonText}>Fermer</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -511,6 +626,48 @@ export default function ProfilScreen() {
               >
                 <Text style={styles.saveButtonText}>
                   {updating ? 'Changement...' : 'Choisir image'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Modal de changement de nom */}
+      <Modal
+        visible={nameModalVisible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setNameModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Modifier le nom</Text>
+
+            <Text style={styles.inputLabel}>Nom d&apos;utilisateur</Text>
+            <TextInput
+              style={styles.textInput}
+              value={editName}
+              onChangeText={setEditName}
+              placeholder="Entrez votre nom"
+              maxLength={50}
+            />
+
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.cancelButton]}
+                onPress={() => setNameModalVisible(false)}
+              >
+                <Text style={styles.cancelButtonText}>Annuler</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.modalButton, styles.saveButton]}
+                onPress={handleSaveName}
+                disabled={updating}
+              >
+                <Text style={styles.saveButtonText}>
+                  {updating ? 'Sauvegarde...' : 'Sauvegarder'}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -700,6 +857,37 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 20,
   },
+  modalSubtitle: {
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
+    marginBottom: 25,
+    lineHeight: 22,
+  },
+  editOptionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f8f9fa',
+    padding: 15,
+    borderRadius: 12,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+  },
+  editOptionContent: {
+    flex: 1,
+    marginLeft: 15,
+  },
+  editOptionTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 2,
+  },
+  editOptionSubtitle: {
+    fontSize: 14,
+    color: '#666',
+  },
   inputLabel: {
     fontSize: 16,
     fontWeight: 'bold',
@@ -786,5 +974,22 @@ const styles = StyleSheet.create({
     borderRadius: 40,
     borderWidth: 2,
     borderColor: '#007AFF',
+  },
+  refreshStatsButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#f0f0f0',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 20,
+    marginTop: 15,
+    alignSelf: 'center',
+  },
+  refreshStatsText: {
+    color: '#007AFF',
+    fontSize: 12,
+    fontWeight: 'bold',
+    marginLeft: 5,
   },
 });

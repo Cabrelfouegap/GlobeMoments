@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { Ionicons } from '@expo/vector-icons';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
@@ -113,12 +114,11 @@ export default function CameraScreen() {
         setIsRecording(true);
         console.log('� Début capture rapide...');
 
-        // Capture ultra-rapide avec options minimales
+        // Capture rapide sans vérifications lourdes
         const photo = await cameraRef.current.takePictureAsync({
-          quality: 0.7, // Réduit pour plus de vitesse
+          quality: 0.8,
           base64: false,
           exif: false,
-          skipProcessing: true, // Android seulement
         });
 
         console.log('✅ Photo capturée:', photo.uri);
@@ -129,11 +129,11 @@ export default function CameraScreen() {
           try {
             // Créer un timeout personnalisé
             const timeoutPromise = new Promise((_, reject) =>
-              setTimeout(() => reject(new Error('Location timeout')), 1000) // 1 seconde
+              setTimeout(() => reject(new Error('Location timeout')), 3000)
             );
 
             const locationPromise = Location.getCurrentPositionAsync({
-              accuracy: Location.Accuracy.Low, // Moins précis mais plus rapide
+              accuracy: Location.Accuracy.High,
             });
 
             location = await Promise.race([locationPromise, timeoutPromise]);
@@ -368,7 +368,7 @@ export default function CameraScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Modal de prévisualisation compacte */}
+      {/* Modal de prévisualisation native */}
       <Modal
         visible={showPreview}
         animationType="fade"
@@ -376,44 +376,69 @@ export default function CameraScreen() {
         statusBarTranslucent={true}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.previewModal}>
+          <SafeAreaView style={styles.previewContainer}>
             {capturedPhoto && (
               <>
-                {/* Image capturée - plus petite */}
+                {/* Image capturée */}
                 <View style={styles.previewImageContainer}>
                   <Image
                     source={{ uri: capturedPhoto.uri }}
-                    style={styles.previewImageSmall}
-                    resizeMode="cover"
+                    style={styles.previewImage}
+                    resizeMode="contain"
                   />
+
+                  {/* Overlay avec informations */}
+                  <View style={styles.imageInfoOverlay}>
+                    <View style={styles.previewInfo}>
+                      <View style={styles.previewInfoItem}>
+                        <Ionicons name="location" size={16} color="#fff" />
+                        <Text style={styles.previewInfoText}>
+                          {capturedPhoto.location.latitude.toFixed(4)}, {capturedPhoto.location.longitude.toFixed(4)}
+                        </Text>
+                      </View>
+                      <View style={styles.previewInfoItem}>
+                        <Ionicons name="time" size={16} color="#fff" />
+                        <Text style={styles.previewInfoText}>
+                          {new Date().toLocaleTimeString()}
+                        </Text>
+                      </View>
+                    </View>
+                  </View>
                 </View>
 
-                {/* Boutons d'action compacts */}
-                <View style={styles.previewActionsCompact}>
+                {/* Boutons d'action */}
+                <View style={styles.previewActions}>
                   <TouchableOpacity
-                    style={[styles.previewActionButtonCompact, styles.discardButton]}
+                    style={[styles.previewActionButton, styles.discardButton]}
                     onPress={discardPhoto}
                     activeOpacity={0.8}
                   >
-                    <Ionicons name="close" size={20} color="#fff" />
+                    <Ionicons name="close-circle" size={28} color="#fff" />
+                    <Text style={styles.previewActionText}>Annuler</Text>
                   </TouchableOpacity>
 
                   <TouchableOpacity
-                    style={[styles.previewActionButtonCompact, styles.saveButton]}
+                    style={[styles.previewActionButton, styles.saveButton]}
                     onPress={savePhoto}
                     activeOpacity={0.8}
                     disabled={isSaving}
                   >
                     {isSaving ? (
-                      <Ionicons name="sync" size={20} color="#fff" />
+                      <>
+                        <Ionicons name="sync" size={28} color="#fff" />
+                        <Text style={styles.previewActionText}>Sauvegarde...</Text>
+                      </>
                     ) : (
-                      <Ionicons name="checkmark" size={20} color="#fff" />
+                      <>
+                        <Ionicons name="checkmark-circle" size={28} color="#fff" />
+                        <Text style={styles.previewActionText}>Sauvegarder</Text>
+                      </>
                     )}
                   </TouchableOpacity>
                 </View>
               </>
             )}
-          </View>
+          </SafeAreaView>
         </View>
       </Modal>
     </View>
@@ -721,49 +746,5 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     marginLeft: 8,
-  },
-  // Nouveaux styles pour la modal compacte
-  previewModal: {
-    width: '85%',
-    maxWidth: 320,
-    backgroundColor: '#000',
-    borderRadius: 20,
-    padding: 16,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 10,
-    },
-    shadowOpacity: 0.5,
-    shadowRadius: 20,
-    elevation: 20,
-  },
-  previewImageSmall: {
-    width: '100%',
-    height: 200,
-    borderRadius: 12,
-  },
-  previewActionsCompact: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    alignItems: 'center',
-    width: '100%',
-    marginTop: 16,
-  },
-  previewActionButtonCompact: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 4,
   },
 });
