@@ -7,12 +7,11 @@ import {
   Alert,
   Modal,
   Platform,
+  Image,
 } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { Ionicons } from '@expo/vector-icons';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
-import * as FileSystem from 'expo-file-system';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { uploadImageAsync, createPhotoDocument, testFirebaseConnection } from '../services/firebase';
@@ -33,6 +32,7 @@ export default function CameraScreen() {
   const [flashMode, setFlashMode] = useState<'off' | 'on' | 'auto'>('off');
   const [isRecording, setIsRecording] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [capturedPhoto, setCapturedPhoto] = useState<{
     uri: string;
     location: { latitude: number; longitude: number };
@@ -111,135 +111,49 @@ export default function CameraScreen() {
     if (cameraRef.current && !isRecording) {
       try {
         setIsRecording(true);
+        console.log('� Début capture rapide...');
 
-        console.log('🔄 Début de la capture de photo...');
-
-        // Vérifications préalables
-        if (!permission || permission.status !== 'granted') {
-          throw new Error('Permission caméra non accordée');
-        }
-
-        if (locationPermission === false) {
-          console.log('⚠️ Localisation non disponible - utilisation d\'une position par défaut');
-          // Ne pas bloquer la prise de photo, juste avertir
-        }
-
-        // Configuration spécifique à Android
-        const cameraOptions: any = {
-          quality: Platform.OS === 'android' ? 0.8 : 0.9,
+        // Capture ultra-rapide avec options minimales
+        const photo = await cameraRef.current.takePictureAsync({
+          quality: 0.7, // Réduit pour plus de vitesse
           base64: false,
           exif: false,
-        };
-
-        // Pour Android, ajouter des options supplémentaires
-        if (Platform.OS === 'android') {
-          cameraOptions.skipProcessing = false;
-          cameraOptions.fastMode = false;
-        }
-
-        console.log('📸 Configuration caméra:', cameraOptions);
-
-        console.log('🔍 Vérification de la référence caméra:', {
-          cameraRefExists: !!cameraRef.current,
-          cameraRefType: typeof cameraRef.current,
-          cameraRefKeys: cameraRef.current ? Object.keys(cameraRef.current) : 'N/A'
+          skipProcessing: true, // Android seulement
         });
 
-        console.log('📸 Tentative de capture...');
-        let photo;
-        try {
-          photo = await cameraRef.current.takePictureAsync(cameraOptions);
-          console.log('✅ takePictureAsync réussi');
-        } catch (takePictureError) {
-          console.error('❌ Erreur takePictureAsync:', takePictureError);
-          const error = takePictureError as Error;
-          throw new Error(`Erreur lors de la capture: ${error.message}`);
-        }
+        console.log('✅ Photo capturée:', photo.uri);
 
-        console.log('✅ Photo capturée avec succès:', {
-          uri: photo.uri,
-          width: photo.width,
-          height: photo.height,
-          exists: photo.uri ? 'oui' : 'non'
-        });
-
-        // Vérifications post-capture pour Android
-        if (Platform.OS === 'android') {
+        // Obtenir la localisation en parallèle avec un timeout court
+        let location: any = null;
+        if (locationPermission === true) {
           try {
-            const fileInfo = await FileSystem.getInfoAsync(photo.uri);
-            console.log('📁 Informations fichier:', {
-              exists: fileInfo.exists,
-              size: fileInfo.exists ? (fileInfo as any).size : 'N/A',
-              uri: fileInfo.uri
+            // Créer un timeout personnalisé
+            const timeoutPromise = new Promise((_, reject) =>
+              setTimeout(() => reject(new Error('Location timeout')), 1000) // 1 seconde
+            );
+
+            const locationPromise = Location.getCurrentPositionAsync({
+              accuracy: Location.Accuracy.Low, // Moins précis mais plus rapide
             });
 
-            if (!fileInfo.exists) {
-              throw new Error('Le fichier photo n\'a pas été créé correctement');
-            }
-
-            if (fileInfo.size === 0) {
-              throw new Error('Le fichier photo est vide');
-            }
-          } catch (fileError) {
-            console.error('❌ Erreur vérification fichier:', fileError);
-            throw new Error('Erreur de sauvegarde du fichier photo');
+            location = await Promise.race([locationPromise, timeoutPromise]);
+          } catch (locationError) {
+            console.warn('⚠️ Localisation rapide échouée:', locationError);
           }
         }
 
-        // Obtenir la localisation avec timeout
-        console.log('📍 Récupération de la localisation...');
-        let location;
-        try {
-          if (locationPermission === true) {
-            const locationOptions = {
-              accuracy: Location.Accuracy.High,
-              timeout: 10000, // 10 secondes timeout
-            };
-
-            location = await Location.getCurrentPositionAsync(locationOptions);
-            console.log('✅ Localisation obtenue:', {
-              latitude: location.coords.latitude,
-              longitude: location.coords.longitude,
-              accuracy: location.coords.accuracy
-            });
-          } else {
-            console.log('⚠️ Localisation non disponible, utilisation de la position par défaut');
-            // Utiliser une localisation par défaut si la géolocalisation n'est pas disponible
-            location = {
-              coords: {
-                latitude: 48.8566, // Paris par défaut
-                longitude: 2.3522,
-                accuracy: 1000,
-              },
-            };
-
-            // Afficher un avertissement à l'utilisateur
-            Alert.alert(
-              'Localisation indisponible',
-              'Impossible d\'obtenir votre position. Une position par défaut sera utilisée pour cette photo.',
-              [{ text: 'OK' }]
-            );
-          }
-        } catch (locationError) {
-          console.warn('⚠️ Erreur de localisation:', locationError);
-
-          // Utiliser une localisation par défaut si la géolocalisation échoue
+        // Position par défaut si localisation échoue
+        if (!location || !location.coords) {
           location = {
             coords: {
-              latitude: 48.8566, // Paris par défaut
+              latitude: 48.8566,
               longitude: 2.3522,
               accuracy: 1000,
             },
           };
-
-          Alert.alert(
-            'Localisation indisponible',
-            'Impossible d\'obtenir votre position. Une position par défaut sera utilisée.',
-            [{ text: 'OK' }]
-          );
         }
 
-        // Créer l'objet photo capturée
+        // Préparer les données et afficher immédiatement
         const capturedPhotoData = {
           uri: photo.uri,
           location: {
@@ -248,43 +162,12 @@ export default function CameraScreen() {
           },
         };
 
-        console.log('🎯 Photo prête pour prévisualisation:', capturedPhotoData);
-
         setCapturedPhoto(capturedPhotoData);
         setShowPreview(true);
 
       } catch (error) {
-        console.error('❌ Erreur complète de capture:', error);
-
-        const err = error as Error;
-        let errorTitle = 'Erreur de capture';
-        let errorMessage = 'Impossible de prendre la photo.';
-
-        // Messages d'erreur spécifiques selon le type d'erreur
-        if (err.message?.includes('permission') || err.message?.includes('denied')) {
-          errorTitle = 'Permission refusée';
-          errorMessage = Platform.OS === 'android'
-            ? 'L\'accès à la caméra a été refusé. Allez dans Paramètres > Applications > GlobeMoments > Permissions et activez la caméra.'
-            : 'L\'accès à la caméra a été refusé. Allez dans Paramètres > Confidentialité > Appareil photo et activez GlobeMoments.';
-        } else if (err.message?.includes('camera') || err.message?.includes('initialis')) {
-          errorTitle = 'Caméra indisponible';
-          errorMessage = 'La caméra n\'est pas disponible. Vérifiez qu\'aucune autre application n\'utilise la caméra.';
-        } else if (err.message?.includes('storage') || err.message?.includes('file')) {
-          errorTitle = 'Erreur de stockage';
-          errorMessage = 'Impossible de sauvegarder la photo. Vérifiez l\'espace de stockage disponible.';
-        } else if (err.message?.includes('location') || err.message?.includes('gps')) {
-          errorTitle = 'Erreur de localisation';
-          errorMessage = 'Impossible d\'obtenir votre position. Vérifiez que la localisation est activée.';
-        } else if (Platform.OS === 'android') {
-          errorTitle = 'Erreur Android';
-          errorMessage = `Erreur système: ${err.message || 'Erreur inconnue'}. Essayez de redémarrer l'application.`;
-        }
-
-        Alert.alert(errorTitle, errorMessage, [
-          { text: 'Réessayer', onPress: () => takePicture() },
-          { text: 'Annuler', style: 'cancel' }
-        ]);
-
+        console.error('❌ Erreur capture:', error);
+        Alert.alert('Erreur', 'Impossible de prendre la photo');
       } finally {
         setIsRecording(false);
       }
@@ -292,27 +175,20 @@ export default function CameraScreen() {
   };
 
   const savePhoto = async () => {
-    if (!capturedPhoto) {
+    if (!capturedPhoto || isSaving) {
       return;
     }
 
-    // Vérifier l'état d'authentification
-    console.log('👤 État utilisateur:', { user: user ? 'connecté' : 'non connecté', userId: user?.uid });
+    setIsSaving(true);
 
     try {
       console.log('💾 Début de la sauvegarde...');
-
-      // Upload vers Firebase Storage
-      console.log('📤 Upload vers Firebase Storage...');
 
       // Utiliser un userId temporaire si non connecté (pour les tests)
       const userId = user?.uid || 'test-user-' + Date.now();
 
       const downloadURL = await uploadImageAsync(capturedPhoto.uri, userId);
       console.log('✅ Upload réussi:', downloadURL);
-
-      // Sauvegarder dans Firestore
-      console.log('💾 Sauvegarde dans Firestore...');
 
       await createPhotoDocument({
         imageUrl: downloadURL,
@@ -343,6 +219,8 @@ export default function CameraScreen() {
       }
 
       Alert.alert('Erreur de sauvegarde', errorMessage);
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -473,7 +351,13 @@ export default function CameraScreen() {
           onPress={takePicture}
           disabled={isRecording}
         >
-          <View style={styles.captureButtonInner} />
+          {isRecording ? (
+            <View style={styles.captureButtonInner}>
+              <Ionicons name="sync" size={24} color="#fff" />
+            </View>
+          ) : (
+            <View style={styles.captureButtonInner} />
+          )}
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -484,35 +368,53 @@ export default function CameraScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Modal de prévisualisation */}
-      <Modal visible={showPreview} animationType="slide">
-        <SafeAreaView style={styles.previewContainer}>
-          {capturedPhoto && (
-            <>
-              <View style={styles.previewImage}>
-                <Text style={styles.previewText}>Photo capturée !</Text>
-              </View>
+      {/* Modal de prévisualisation compacte */}
+      <Modal
+        visible={showPreview}
+        animationType="fade"
+        transparent={true}
+        statusBarTranslucent={true}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.previewModal}>
+            {capturedPhoto && (
+              <>
+                {/* Image capturée - plus petite */}
+                <View style={styles.previewImageContainer}>
+                  <Image
+                    source={{ uri: capturedPhoto.uri }}
+                    style={styles.previewImageSmall}
+                    resizeMode="cover"
+                  />
+                </View>
 
-              <View style={styles.previewControls}>
-                <TouchableOpacity
-                  style={[styles.previewButton, styles.discardButton]}
-                  onPress={discardPhoto}
-                >
-                  <Ionicons name="close" size={24} color="#fff" />
-                  <Text style={styles.previewButtonText}>Annuler</Text>
-                </TouchableOpacity>
+                {/* Boutons d'action compacts */}
+                <View style={styles.previewActionsCompact}>
+                  <TouchableOpacity
+                    style={[styles.previewActionButtonCompact, styles.discardButton]}
+                    onPress={discardPhoto}
+                    activeOpacity={0.8}
+                  >
+                    <Ionicons name="close" size={20} color="#fff" />
+                  </TouchableOpacity>
 
-                <TouchableOpacity
-                  style={[styles.previewButton, styles.saveButton]}
-                  onPress={savePhoto}
-                >
-                  <Ionicons name="checkmark" size={24} color="#fff" />
-                  <Text style={styles.previewButtonText}>Sauvegarder</Text>
-                </TouchableOpacity>
-              </View>
-            </>
-          )}
-        </SafeAreaView>
+                  <TouchableOpacity
+                    style={[styles.previewActionButtonCompact, styles.saveButton]}
+                    onPress={savePhoto}
+                    activeOpacity={0.8}
+                    disabled={isSaving}
+                  >
+                    {isSaving ? (
+                      <Ionicons name="sync" size={20} color="#fff" />
+                    ) : (
+                      <Ionicons name="checkmark" size={20} color="#fff" />
+                    )}
+                  </TouchableOpacity>
+                </View>
+              </>
+            )}
+          </View>
+        </View>
       </Modal>
     </View>
   );
@@ -577,12 +479,6 @@ const styles = StyleSheet.create({
   previewContainer: {
     flex: 1,
     backgroundColor: '#000',
-  },
-  previewImage: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#007AFF',
   },
   previewText: {
     color: '#fff',
@@ -753,5 +649,121 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: 'bold',
     marginLeft: 4,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  previewImageContainer: {
+    flex: 1,
+    width: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  previewImage: {
+    width: '90%',
+    height: '70%',
+    borderRadius: 20,
+  },
+  imageInfoOverlay: {
+    position: 'absolute',
+    top: 20,
+    left: 20,
+    right: 20,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    borderRadius: 12,
+    padding: 12,
+  },
+  previewInfo: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  previewInfoItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  previewInfoText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '500',
+    marginLeft: 6,
+  },
+  previewActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    alignItems: 'center',
+    paddingVertical: 30,
+    paddingHorizontal: 20,
+  },
+  previewActionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    borderRadius: 30,
+    minWidth: 140,
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  previewActionText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+    marginLeft: 8,
+  },
+  // Nouveaux styles pour la modal compacte
+  previewModal: {
+    width: '85%',
+    maxWidth: 320,
+    backgroundColor: '#000',
+    borderRadius: 20,
+    padding: 16,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 10,
+    },
+    shadowOpacity: 0.5,
+    shadowRadius: 20,
+    elevation: 20,
+  },
+  previewImageSmall: {
+    width: '100%',
+    height: 200,
+    borderRadius: 12,
+  },
+  previewActionsCompact: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    alignItems: 'center',
+    width: '100%',
+    marginTop: 16,
+  },
+  previewActionButtonCompact: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 4,
   },
 });
