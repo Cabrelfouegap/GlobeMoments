@@ -21,7 +21,11 @@
       "supportsTablet": true,
       "infoPlist": {
         "NSCameraUsageDescription": "Cette app utilise la caméra pour prendre des photos de vos voyages.",
-        "NSLocationWhenInUseUsageDescription": "Cette app utilise votre position pour géolocaliser vos photos."
+        "NSLocationWhenInUseUsageDescription": "Cette app utilise votre position pour géolocaliser vos photos.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "Cette app utilise votre position pour géolocaliser vos photos.",
+        "NSPhotoLibraryUsageDescription": "Cette app sauvegarde vos photos dans la bibliothèque.",
+        "NSPhotoLibraryAddUsageDescription": "Cette app sauvegarde vos photos dans la bibliothèque.",
+        "NSMicrophoneUsageDescription": "Cette app utilise le microphone pour l'enregistrement audio."
       }
     },
     "android": {
@@ -34,8 +38,17 @@
         "android.permission.CAMERA",
         "android.permission.RECORD_AUDIO",
         "android.permission.ACCESS_FINE_LOCATION",
-        "android.permission.ACCESS_COARSE_LOCATION"
-      ]
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.READ_MEDIA_VIDEO"
+      ],
+      "config": {
+        "googleMaps": {
+          "apiKey": "YOUR_GOAIzaSyB3LNf5wi8NcdRe2p1_7pEo8PXixjMY-cA"
+        }
+      }
     },
     "web": {
       "bundler": "metro",
@@ -54,7 +67,7 @@
       ]
     ],
     "experiments": {
-      "typedRoutes": true
+      "typedRoutes": false
     }
   }
 }
