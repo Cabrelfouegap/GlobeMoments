@@ -4,7 +4,7 @@
 import { initializeApp } from 'firebase/app';
 import { initializeAuth, getReactNativePersistence } from 'firebase/auth';
 import ReactNativeAsyncStorage from '@react-native-async-storage/async-storage';
-import { getFirestore, addDoc, collection, serverTimestamp } from 'firebase/firestore';
+import { getFirestore, addDoc, collection, serverTimestamp, getDocs, doc, updateDoc, increment, query, where } from 'firebase/firestore';
 import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import Constants from 'expo-constants';
 
@@ -27,16 +27,21 @@ const db = getFirestore(app);
 const storage = getStorage(app);
 
 // Helper pour uploader une image
-export async function uploadImageAsync(uri, path = 'photos') {
+export async function uploadImageAsync(uri, userId, path = 'photos') {
   try {
     console.log('🔄 Début upload Firebase Storage:', uri);
+
+    if (!userId) {
+      throw new Error('UserId requis pour l\'upload (règles de sécurité)');
+    }
 
     const response = await fetch(uri);
     const blob = await response.blob();
 
     console.log('📦 Blob créé, taille:', blob.size);
 
-    const storageRef = ref(storage, `${path}/${Date.now()}`);
+    // Chemin structuré par userId pour respecter les règles de sécurité
+    const storageRef = ref(storage, `${path}/${userId}/${Date.now()}`);
     console.log('📁 Référence storage créée:', storageRef.fullPath);
 
     const uploadResult = await uploadBytes(storageRef, blob);
@@ -52,25 +57,7 @@ export async function uploadImageAsync(uri, path = 'photos') {
   }
 }
 
-// Helper pour créer un document photo
-export async function createPhotoDocument({ imageUrl, coords, userId }) {
-  try {
-    console.log('💾 Début création document Firestore:', { imageUrl, coords, userId });
 
-    const docRef = await addDoc(collection(db, 'photos'), {
-      imageUrl,
-      coords,
-      userId,
-      date: serverTimestamp(),
-    });
-
-    console.log('✅ Document créé avec ID:', docRef.id);
-    return docRef;
-  } catch (error) {
-    console.error('❌ Erreur création document Firestore:', error);
-    throw error;
-  }
-}
 
 export { auth, db, storage };
 
@@ -97,5 +84,86 @@ export async function testFirebaseConnection() {
   } catch (error) {
     console.error('❌ Erreur de connexion Firebase:', error);
     return { success: false, message: error.message, error };
+  }
+}
+
+// Fonction pour mettre à jour le compteur de photos d'un utilisateur
+export async function updateUserPhotoCount(userId) {
+  try {
+    console.log('� Mise à jour du compteur de photos pour:', userId);
+
+    // Compter les photos actives de l'utilisateur
+    const photosQuery = query(
+      collection(db, 'photos'),
+      where('userId', '==', userId),
+      where('isActive', '==', true)
+    );
+    const photosSnapshot = await getDocs(photosQuery);
+    const photoCount = photosSnapshot.size;
+
+    // Mettre à jour le document utilisateur
+    const userRef = doc(db, 'users', userId);
+    await updateDoc(userRef, {
+      photoCount: photoCount,
+      updatedAt: serverTimestamp(),
+    });
+
+    console.log('✅ Compteur de photos mis à jour:', photoCount);
+    return photoCount;
+  } catch (error) {
+    console.error('❌ Erreur mise à jour compteur photos:', error);
+    throw error;
+  }
+}
+
+// Fonction pour supprimer une photo (soft delete)
+export async function deletePhotoDocument(photoId, userId) {
+  try {
+    console.log('�️ Suppression de la photo:', photoId);
+
+    const photoRef = doc(db, 'photos', photoId);
+    await updateDoc(photoRef, {
+      isActive: false,
+      deletedAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
+
+    // Mettre à jour le compteur de photos
+    await updateUserPhotoCount(userId);
+
+    console.log('✅ Photo marquée comme supprimée');
+  } catch (error) {
+    console.error('❌ Erreur suppression photo:', error);
+    throw error;
+  }
+}
+// services/firebase.ts
+// ... (tout ton code inchangé au-dessus)
+
+
+
+export async function createPhotoDocument({ imageUrl, coords, userId, place = null }) {
+  try {
+    console.log('💾 Début création document Firestore:', { imageUrl, coords, userId, place });
+
+    const docRef = await addDoc(collection(db, 'photos'), {
+      imageUrl,
+      coords: coords || null,
+      userId,
+      place: place || null, // <-- ajouté (facultatif)
+      date: serverTimestamp(),
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+      isActive: true,
+    });
+
+    console.log('✅ Document créé avec ID:', docRef.id);
+
+    await updateUserPhotoCount(userId);
+
+    return docRef;
+  } catch (error) {
+    console.error('❌ Erreur création document Firestore:', error);
+    throw error;
   }
 }

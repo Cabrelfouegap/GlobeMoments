@@ -39,7 +39,9 @@ export default function LoginScreen() {
           name,
           email,
           createdAt: new Date(),
+          updatedAt: new Date(),
           photoCount: 0,
+          isActive: true,
         });
       }
     } catch (error) {

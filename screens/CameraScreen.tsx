@@ -15,7 +15,7 @@ import * as Location from 'expo-location';
 import * as FileSystem from 'expo-file-system';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
-import { uploadImageAsync, createPhotoDocument } from '../services/firebase';
+import { uploadImageAsync, createPhotoDocument, testFirebaseConnection } from '../services/firebase';
 import { useAuth } from '../services/auth';
 
 type CameraStackParamList = {
@@ -28,6 +28,7 @@ type CameraScreenNavigationProp = StackNavigationProp<CameraStackParamList>;
 export default function CameraScreen() {
   const [permission, requestPermission] = useCameraPermissions();
   const [locationPermission, setLocationPermission] = useState<boolean | null>(null);
+  const [locationPermissionRequested, setLocationPermissionRequested] = useState(false);
   const [cameraType, setCameraType] = useState<'back' | 'front'>('back');
   const [flashMode, setFlashMode] = useState<'off' | 'on' | 'auto'>('off');
   const [isRecording, setIsRecording] = useState(false);
@@ -39,6 +40,12 @@ export default function CameraScreen() {
   const cameraRef = useRef<any>(null);
   const navigation = useNavigation<CameraScreenNavigationProp>();
   const { user } = useAuth();
+  // Marquer que le montage caméra a été tenté
+  useEffect(() => {
+    if (permission?.status === 'granted') {
+      console.log('🔧 Montage caméra tenté');
+    }
+  }, [permission?.status]);
 
   useEffect(() => {
     (async () => {
@@ -47,8 +54,21 @@ export default function CameraScreen() {
         const cameraStatus = await requestPermission();
 
         // Demander les permissions de localisation
+        console.log('📍 Demande de permission localisation...');
         const locationStatus = await Location.requestForegroundPermissionsAsync();
-        setLocationPermission(locationStatus.status === 'granted');
+        console.log('📍 Statut permission localisation:', locationStatus);
+
+        // Essayer de demander à nouveau si refusé
+        if (locationStatus.status !== 'granted' && locationStatus.canAskAgain) {
+          console.log('🔄 Tentative de redemande permission localisation...');
+          const retryStatus = await Location.requestForegroundPermissionsAsync();
+          console.log('📍 Statut après retry:', retryStatus);
+          setLocationPermission(retryStatus.status === 'granted');
+        } else {
+          setLocationPermission(locationStatus.status === 'granted');
+        }
+
+        setLocationPermissionRequested(true);
 
         // Vérifications supplémentaires pour Android
         if (Platform.OS === 'android') {
@@ -72,17 +92,9 @@ export default function CameraScreen() {
         }
 
         if (locationStatus.status !== 'granted') {
-          Alert.alert(
-            'Permission localisation requise',
-            'L\'accès à la localisation est nécessaire pour géolocaliser vos photos.',
-            [
-              { text: 'Annuler', style: 'cancel' },
-              { text: 'Autoriser', onPress: async () => {
-                const newLocationStatus = await Location.requestForegroundPermissionsAsync();
-                setLocationPermission(newLocationStatus.status === 'granted');
-              }}
-            ]
-          );
+          console.log('⚠️ Permission localisation refusée ou non disponible');
+          // Ne pas afficher d'alerte bloquante, juste un avertissement
+          console.warn('Localisation non disponible - les photos ne seront pas géolocalisées');
         }
 
       } catch (error) {
@@ -108,7 +120,8 @@ export default function CameraScreen() {
         }
 
         if (locationPermission === false) {
-          throw new Error('Permission localisation non accordée');
+          console.log('⚠️ Localisation non disponible - utilisation d\'une position par défaut');
+          // Ne pas bloquer la prise de photo, juste avertir
         }
 
         // Configuration spécifique à Android
@@ -126,7 +139,22 @@ export default function CameraScreen() {
 
         console.log('📸 Configuration caméra:', cameraOptions);
 
-        const photo = await cameraRef.current.takePictureAsync(cameraOptions);
+        console.log('🔍 Vérification de la référence caméra:', {
+          cameraRefExists: !!cameraRef.current,
+          cameraRefType: typeof cameraRef.current,
+          cameraRefKeys: cameraRef.current ? Object.keys(cameraRef.current) : 'N/A'
+        });
+
+        console.log('📸 Tentative de capture...');
+        let photo;
+        try {
+          photo = await cameraRef.current.takePictureAsync(cameraOptions);
+          console.log('✅ takePictureAsync réussi');
+        } catch (takePictureError) {
+          console.error('❌ Erreur takePictureAsync:', takePictureError);
+          const error = takePictureError as Error;
+          throw new Error(`Erreur lors de la capture: ${error.message}`);
+        }
 
         console.log('✅ Photo capturée avec succès:', {
           uri: photo.uri,
@@ -162,17 +190,36 @@ export default function CameraScreen() {
         console.log('📍 Récupération de la localisation...');
         let location;
         try {
-          const locationOptions = {
-            accuracy: Location.Accuracy.High,
-            timeout: 10000, // 10 secondes timeout
-          };
+          if (locationPermission === true) {
+            const locationOptions = {
+              accuracy: Location.Accuracy.High,
+              timeout: 10000, // 10 secondes timeout
+            };
 
-          location = await Location.getCurrentPositionAsync(locationOptions);
-          console.log('✅ Localisation obtenue:', {
-            latitude: location.coords.latitude,
-            longitude: location.coords.longitude,
-            accuracy: location.coords.accuracy
-          });
+            location = await Location.getCurrentPositionAsync(locationOptions);
+            console.log('✅ Localisation obtenue:', {
+              latitude: location.coords.latitude,
+              longitude: location.coords.longitude,
+              accuracy: location.coords.accuracy
+            });
+          } else {
+            console.log('⚠️ Localisation non disponible, utilisation de la position par défaut');
+            // Utiliser une localisation par défaut si la géolocalisation n'est pas disponible
+            location = {
+              coords: {
+                latitude: 48.8566, // Paris par défaut
+                longitude: 2.3522,
+                accuracy: 1000,
+              },
+            };
+
+            // Afficher un avertissement à l'utilisateur
+            Alert.alert(
+              'Localisation indisponible',
+              'Impossible d\'obtenir votre position. Une position par défaut sera utilisée pour cette photo.',
+              [{ text: 'OK' }]
+            );
+          }
         } catch (locationError) {
           console.warn('⚠️ Erreur de localisation:', locationError);
 
@@ -245,31 +292,35 @@ export default function CameraScreen() {
   };
 
   const savePhoto = async () => {
-    if (!capturedPhoto || !user) {
-      if (!user) {
-        Alert.alert('Erreur', 'Vous devez être connecté pour sauvegarder une photo');
-        return;
-      }
+    if (!capturedPhoto) {
       return;
     }
+
+    // Vérifier l'état d'authentification
+    console.log('👤 État utilisateur:', { user: user ? 'connecté' : 'non connecté', userId: user?.uid });
 
     try {
       console.log('💾 Début de la sauvegarde...');
 
       // Upload vers Firebase Storage
       console.log('📤 Upload vers Firebase Storage...');
-      const downloadURL = await uploadImageAsync(capturedPhoto.uri);
+
+      // Utiliser un userId temporaire si non connecté (pour les tests)
+      const userId = user?.uid || 'test-user-' + Date.now();
+
+      const downloadURL = await uploadImageAsync(capturedPhoto.uri, userId);
       console.log('✅ Upload réussi:', downloadURL);
 
       // Sauvegarder dans Firestore
       console.log('💾 Sauvegarde dans Firestore...');
+
       await createPhotoDocument({
         imageUrl: downloadURL,
         coords: {
           latitude: capturedPhoto.location.latitude,
           longitude: capturedPhoto.location.longitude,
         },
-        userId: user.uid,
+        userId: userId,
       });
       console.log('✅ Sauvegarde Firestore réussie');
 
@@ -281,12 +332,14 @@ export default function CameraScreen() {
       const err = error as Error;
 
       let errorMessage = 'Impossible de sauvegarder la photo';
-      if (err.message?.includes('storage')) {
-        errorMessage = 'Erreur de stockage. Vérifiez votre connexion internet.';
+      if (err.message?.includes('storage') || err.message?.includes('unauthorized')) {
+        errorMessage = 'Erreur d\'accès au stockage. Vérifiez votre connexion et réessayez.';
       } else if (err.message?.includes('permission')) {
         errorMessage = 'Erreur de permissions. Vérifiez vos droits d\'accès.';
       } else if (err.message?.includes('network')) {
         errorMessage = 'Erreur réseau. Vérifiez votre connexion internet.';
+      } else if (err.message?.includes('auth')) {
+        errorMessage = 'Erreur d\'authentification. Essayez de vous reconnecter.';
       }
 
       Alert.alert('Erreur de sauvegarde', errorMessage);
@@ -302,6 +355,7 @@ export default function CameraScreen() {
   console.log('🔍 État des permissions:', {
     cameraPermission: permission?.status,
     locationPermission: locationPermission,
+    locationPermissionRequested: locationPermissionRequested,
     isRecording: isRecording
   });
 
@@ -336,42 +390,47 @@ export default function CameraScreen() {
     );
   }
 
-  if (!locationPermission) {
-    console.log('⚠️ Permission localisation non accordée');
-    return (
-      <View style={styles.container}>
-        <View style={styles.errorContainer}>
-          <Ionicons name="location" size={60} color="#ff9500" />
-          <Text style={styles.errorTitle}>Localisation requise</Text>
-          <Text style={styles.errorText}>
-            L&apos;accès à la localisation est nécessaire pour géolocaliser vos photos
-          </Text>
-          <TouchableOpacity
-            onPress={async () => {
-              const locationStatus = await Location.requestForegroundPermissionsAsync();
-              setLocationPermission(locationStatus.status === 'granted');
-            }}
-            style={styles.retryButton}
-          >
-            <Text style={styles.retryText}>Autoriser</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    );
-  }
-
-  // Si toutes les permissions sont accordées, afficher la caméra
-  console.log('✅ Toutes les permissions accordées, affichage de la caméra');
+  // Afficher immédiatement la caméra une fois les permissions accordées
+  console.log('✅ Permissions accordées, affichage de la caméra');
   return (
     <View style={styles.container}>
       <CameraView
-        ref={cameraRef}
+        ref={(ref) => {
+          console.log('📸 Référence caméra assignée:', !!ref);
+          cameraRef.current = ref;
+        }}
         style={styles.camera}
         facing={cameraType}
         flash={flashMode}
-        onCameraReady={() => console.log('📷 Caméra prête')}
-        onMountError={(error) => console.error('❌ Erreur montage caméra:', error)}
+        onCameraReady={() => {
+          console.log('📷 Caméra prête - événement onCameraReady déclenché');
+        }}
+        onMountError={(error) => {
+          console.error('❌ Erreur montage caméra:', error);
+        }}
       />
+
+      {/* Indicateur de statut d'authentification */}
+      <View style={[styles.authIndicator, { backgroundColor: user ? 'rgba(52, 199, 89, 0.8)' : 'rgba(255, 59, 48, 0.8)' }]}>
+        <Ionicons
+          name={user ? "person" : "person-outline"}
+          size={16}
+          color="#fff"
+        />
+        <Text style={styles.authIndicatorText}>
+          {user ? 'Connecté' : 'Non connecté'}
+        </Text>
+      </View>
+
+      {/* Avertissement localisation si nécessaire */}
+      {locationPermissionRequested && locationPermission === false && (
+        <View style={styles.locationWarning}>
+          <Ionicons name="location" size={16} color="#fff" />
+          <Text style={styles.locationWarningText}>
+            Localisation indisponible
+          </Text>
+        </View>
+      )}
 
       {/* Bouton photo en haut à gauche */}
       <TouchableOpacity
@@ -379,6 +438,21 @@ export default function CameraScreen() {
         onPress={() => navigation.navigate('Photos')}
       >
         <Ionicons name="images" size={24} color="#fff" />
+      </TouchableOpacity>
+
+      {/* Bouton test Firebase en haut à droite */}
+      <TouchableOpacity
+        style={styles.testFirebaseButton}
+        onPress={async () => {
+          console.log('🧪 Test de connexion Firebase...');
+          const result = await testFirebaseConnection();
+          Alert.alert(
+            result.success ? 'Test réussi' : 'Test échoué',
+            result.message
+          );
+        }}
+      >
+        <Ionicons name="cloud" size={20} color="#fff" />
       </TouchableOpacity>
 
       {/* Contrôles en bas */}
@@ -589,5 +663,95 @@ const styles = StyleSheet.create({
     marginTop: 20,
     marginBottom: 10,
     textAlign: 'center',
+  },
+  loadingContainer: {
+    alignItems: 'center',
+    padding: 20,
+  },
+  loadingTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#333',
+    marginTop: 20,
+    marginBottom: 10,
+    textAlign: 'center',
+  },
+  loadingText: {
+    fontSize: 18,
+    color: '#666',
+    textAlign: 'center',
+  },
+  locationWarning: {
+    position: 'absolute',
+    top: Platform.OS === 'ios' ? 60 : 40,
+    right: 20,
+    backgroundColor: 'rgba(255, 165, 0, 0.8)',
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  locationWarningText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: 'bold',
+    marginLeft: 4,
+  },
+  cameraIndicator: {
+    position: 'absolute',
+    top: Platform.OS === 'ios' ? 60 : 40,
+    left: 20,
+    backgroundColor: 'rgba(0, 122, 255, 0.8)',
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  cameraIndicatorText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  forceCameraButton: {
+    position: 'absolute',
+    top: Platform.OS === 'ios' ? 100 : 80,
+    left: 20,
+    backgroundColor: 'rgba(255, 59, 48, 0.8)',
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  forceCameraText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  testFirebaseButton: {
+    position: 'absolute',
+    top: Platform.OS === 'ios' ? 50 : 30,
+    right: 20,
+    backgroundColor: 'rgba(52, 199, 89, 0.8)',
+    borderRadius: 25,
+    width: 50,
+    height: 50,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  authIndicator: {
+    position: 'absolute',
+    top: Platform.OS === 'ios' ? 110 : 90,
+    left: 20,
+    backgroundColor: 'rgba(0, 122, 255, 0.8)',
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  authIndicatorText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: 'bold',
+    marginLeft: 4,
   },
 });

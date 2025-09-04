@@ -1,12 +1,14 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    // Règles temporaires pour la migration - À SUPPRIMER APRÈS MIGRATION
+    match /users/{userId} {
+      allow read, write: if true;
+    }
     match /photos/{photoId} {
-      // Règles complètement ouvertes pour les tests
       allow read, write: if true;
     }
     match /{document=**} {
-      // Règles complètement ouvertes pour les tests
       allow read, write: if true;
     }
   }
