@@ -1,11 +1,16 @@
 // CalendrierScreen.js
 // Écran d'affichage du calendrier des photos
-import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
-import { Calendar } from 'react-native-calendars';
 import { Ionicons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
+import { StyleSheet, Text, View } from 'react-native';
+import { Calendar } from 'react-native-calendars';
 
 export default function CalendrierScreen() {
+  const navigation = useNavigation();
+  
+  const handleDayPress = (day) => {
+    navigation.navigate('Photos', { selectedDate: day.dateString });
+  };
   return (
     <View style={styles.container}>
       <View style={styles.header}>
@@ -32,10 +37,10 @@ export default function CalendrierScreen() {
           textMonthFontSize: 18,
           textDayHeaderFontSize: 14
         }}
-        // Add marked dates for photos
         markedDates={{
           '2025-09-03': { marked: true, dotColor: '#007AFF' },
         }}
+        onDayPress={handleDayPress}
       />
     </View>
   );

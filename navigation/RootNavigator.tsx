@@ -1,14 +1,13 @@
-import React from 'react';
+import { MaterialIcons } from '@expo/vector-icons';
+import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { MaterialIcons } from '@expo/vector-icons';
-import CameraScreen from '../ecrans/CameraScreen';
-import PhotosScreen from '../ecrans/PhotosScreen';
-import CarteScreen from '../ecrans/CarteScreen';
-import CalendrierScreen from '../ecrans/CalendrierScreen';
-import ProfilScreen from '../ecrans/ProfilScreen';
 import AuthScreen from '../ecrans/AuthScreen';
+import CalendrierScreen from '../ecrans/CalendrierScreen';
+import CameraScreen from '../ecrans/CameraScreen';
+import CarteScreen from '../ecrans/CarteScreen';
+import PhotosScreen from '../ecrans/PhotosScreen';
+import ProfilScreen from '../ecrans/ProfilScreen';
 import { useAuth } from '../services/auth';
 
 const Stack = createNativeStackNavigator();
@@ -79,10 +78,13 @@ export default function RootNavigator() {
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         {user ? (
           <Stack.Screen name="Main" component={MainTabs} />
+          <Stack.Screen name="Calendrier" component={CalendrierScreen} />
+          <Stack.Screen name="Photos" component={PhotosScreen} />
         ) : (
           <Stack.Screen name="Auth" component={AuthScreen} />
         )}
       </Stack.Navigator>
+
     </NavigationContainer>
   );
 }
