@@ -11,11 +11,10 @@ import {
 } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { Ionicons } from '@expo/vector-icons';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
-import { uploadImageAsync, createPhotoDocument, testFirebaseConnection } from '../services/firebase';
+import { uploadImageAsync, createPhotoDocument } from '../services/firebase';
 import { useAuth } from '../services/auth';
 
 type CameraStackParamList = {
@@ -114,11 +113,12 @@ export default function CameraScreen() {
         setIsRecording(true);
         console.log('� Début capture rapide...');
 
-        // Capture rapide sans vérifications lourdes
+        // Capture ultra-rapide avec options minimales
         const photo = await cameraRef.current.takePictureAsync({
-          quality: 0.8,
+          quality: 0.7, // Réduit pour plus de vitesse
           base64: false,
           exif: false,
+          skipProcessing: true, // Android seulement
         });
 
         console.log('✅ Photo capturée:', photo.uri);
@@ -129,11 +129,11 @@ export default function CameraScreen() {
           try {
             // Créer un timeout personnalisé
             const timeoutPromise = new Promise((_, reject) =>
-              setTimeout(() => reject(new Error('Location timeout')), 3000)
+              setTimeout(() => reject(new Error('Location timeout')), 1000) // 1 seconde
             );
 
             const locationPromise = Location.getCurrentPositionAsync({
-              accuracy: Location.Accuracy.High,
+              accuracy: Location.Accuracy.Low, // Moins précis mais plus rapide
             });
 
             location = await Promise.race([locationPromise, timeoutPromise]);
@@ -318,21 +318,6 @@ export default function CameraScreen() {
         <Ionicons name="images" size={24} color="#fff" />
       </TouchableOpacity>
 
-      {/* Bouton test Firebase en haut à droite */}
-      <TouchableOpacity
-        style={styles.testFirebaseButton}
-        onPress={async () => {
-          console.log('🧪 Test de connexion Firebase...');
-          const result = await testFirebaseConnection();
-          Alert.alert(
-            result.success ? 'Test réussi' : 'Test échoué',
-            result.message
-          );
-        }}
-      >
-        <Ionicons name="cloud" size={20} color="#fff" />
-      </TouchableOpacity>
-
       {/* Contrôles en bas */}
       <View style={styles.controls}>
         <TouchableOpacity
@@ -368,7 +353,7 @@ export default function CameraScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Modal de prévisualisation native */}
+      {/* Modal de prévisualisation compacte */}
       <Modal
         visible={showPreview}
         animationType="fade"
@@ -376,69 +361,44 @@ export default function CameraScreen() {
         statusBarTranslucent={true}
       >
         <View style={styles.modalOverlay}>
-          <SafeAreaView style={styles.previewContainer}>
+          <View style={styles.previewModal}>
             {capturedPhoto && (
               <>
-                {/* Image capturée */}
+                {/* Image capturée - plus petite */}
                 <View style={styles.previewImageContainer}>
                   <Image
                     source={{ uri: capturedPhoto.uri }}
-                    style={styles.previewImage}
-                    resizeMode="contain"
+                    style={styles.previewImageSmall}
+                    resizeMode="cover"
                   />
-
-                  {/* Overlay avec informations */}
-                  <View style={styles.imageInfoOverlay}>
-                    <View style={styles.previewInfo}>
-                      <View style={styles.previewInfoItem}>
-                        <Ionicons name="location" size={16} color="#fff" />
-                        <Text style={styles.previewInfoText}>
-                          {capturedPhoto.location.latitude.toFixed(4)}, {capturedPhoto.location.longitude.toFixed(4)}
-                        </Text>
-                      </View>
-                      <View style={styles.previewInfoItem}>
-                        <Ionicons name="time" size={16} color="#fff" />
-                        <Text style={styles.previewInfoText}>
-                          {new Date().toLocaleTimeString()}
-                        </Text>
-                      </View>
-                    </View>
-                  </View>
                 </View>
 
-                {/* Boutons d'action */}
-                <View style={styles.previewActions}>
+                {/* Boutons d'action compacts */}
+                <View style={styles.previewActionsCompact}>
                   <TouchableOpacity
-                    style={[styles.previewActionButton, styles.discardButton]}
+                    style={[styles.previewActionButtonCompact, styles.discardButton]}
                     onPress={discardPhoto}
                     activeOpacity={0.8}
                   >
-                    <Ionicons name="close-circle" size={28} color="#fff" />
-                    <Text style={styles.previewActionText}>Annuler</Text>
+                    <Ionicons name="close" size={20} color="#fff" />
                   </TouchableOpacity>
 
                   <TouchableOpacity
-                    style={[styles.previewActionButton, styles.saveButton]}
+                    style={[styles.previewActionButtonCompact, styles.saveButton]}
                     onPress={savePhoto}
                     activeOpacity={0.8}
                     disabled={isSaving}
                   >
                     {isSaving ? (
-                      <>
-                        <Ionicons name="sync" size={28} color="#fff" />
-                        <Text style={styles.previewActionText}>Sauvegarde...</Text>
-                      </>
+                      <Ionicons name="sync" size={20} color="#fff" />
                     ) : (
-                      <>
-                        <Ionicons name="checkmark-circle" size={28} color="#fff" />
-                        <Text style={styles.previewActionText}>Sauvegarder</Text>
-                      </>
+                      <Ionicons name="checkmark" size={20} color="#fff" />
                     )}
                   </TouchableOpacity>
                 </View>
               </>
             )}
-          </SafeAreaView>
+          </View>
         </View>
       </Modal>
     </View>
@@ -647,17 +607,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: 'bold',
   },
-  testFirebaseButton: {
-    position: 'absolute',
-    top: Platform.OS === 'ios' ? 50 : 30,
-    right: 20,
-    backgroundColor: 'rgba(52, 199, 89, 0.8)',
-    borderRadius: 25,
-    width: 50,
-    height: 50,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
   authIndicator: {
     position: 'absolute',
     top: Platform.OS === 'ios' ? 110 : 90,
@@ -746,5 +695,49 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     marginLeft: 8,
+  },
+  // Nouveaux styles pour la modal compacte
+  previewModal: {
+    width: '85%',
+    maxWidth: 320,
+    backgroundColor: '#000',
+    borderRadius: 20,
+    padding: 16,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 10,
+    },
+    shadowOpacity: 0.5,
+    shadowRadius: 20,
+    elevation: 20,
+  },
+  previewImageSmall: {
+    width: '100%',
+    height: 200,
+    borderRadius: 12,
+  },
+  previewActionsCompact: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    alignItems: 'center',
+    width: '100%',
+    marginTop: 16,
+  },
+  previewActionButtonCompact: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 4,
   },
 });

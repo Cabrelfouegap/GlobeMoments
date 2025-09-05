@@ -8,10 +8,8 @@ import {
   TouchableOpacity,
   Dimensions,
   Modal,
-  ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { db } from '../services/firebase';
 import { useAuth } from '../services/auth';
@@ -491,6 +489,68 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#ccc',
     textAlign: 'center',
+  },
+  // Nouveaux styles pour le modal compact
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  photoModal: {
+    width: '100%',
+    maxWidth: 500,
+    backgroundColor: '#000',
+    borderRadius: 20,
+    padding: 16,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 10,
+    },
+    shadowOpacity: 0.5,
+    shadowRadius: 20,
+    elevation: 20,
+  },
+  closeButtonCompact: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    borderRadius: 16,
+    width: 32,
+    height: 32,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 10,
+  },
+  photoModalContent: {
+    width: '100%',
+    alignItems: 'center',
+  },
+  photoModalImage: {
+    width: '100%',
+    height: 400,
+    borderRadius: 12,
+  },
+  photoModalInfo: {
+    width: '100%',
+    marginTop: 16,
+    paddingHorizontal: 8,
+  },
+  photoModalDate: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  photoModalLocation: {
+    color: '#fff',
+    fontSize: 14,
+    textAlign: 'center',
+    opacity: 0.9,
   },
 });
 
@@ -1031,41 +1091,47 @@ export default function PhotosScreen() {
         />
       )}
 
-      {/* Modal pour afficher la photo en grand */}
-      <Modal visible={showModal} animationType="fade">
-        <SafeAreaView style={styles.modalContainer}>
-          <TouchableOpacity
-            style={styles.closeButton}
-            onPress={() => setShowModal(false)}
-          >
-            <Ionicons name="close" size={30} color="#fff" />
-          </TouchableOpacity>
+      {/* Modal pour afficher la photo en grand - version compacte */}
+      <Modal visible={showModal} animationType="fade" transparent={true}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.photoModal}>
+            <TouchableOpacity
+              style={styles.closeButtonCompact}
+              onPress={() => setShowModal(false)}
+            >
+              <Ionicons name="close" size={24} color="#fff" />
+            </TouchableOpacity>
 
-          {selectedPhoto && (
-            <View style={styles.modalContent}>
-              <Image
-                source={{ uri: selectedPhoto.imageUrl }}
-                style={styles.modalImage}
-                resizeMode="contain"
-              />
+            {selectedPhoto && (
+              <>
+                {/* Image compacte */}
+                <View style={styles.photoModalContent}>
+                  <Image
+                    source={{ uri: selectedPhoto.imageUrl }}
+                    style={styles.photoModalImage}
+                    resizeMode="cover"
+                  />
+                </View>
 
-              <View style={styles.photoInfo}>
-                <Text style={styles.photoDate}>
-                  📅 {new Date(selectedPhoto.date?.seconds * 1000 || selectedPhoto.date).toLocaleDateString()}
-                </Text>
-                {selectedPhoto.coords && (
-                  <Text style={styles.photoLocation}>
-                    📍 {(() => {
-                      const key = `${selectedPhoto.coords.latitude.toFixed(4)},${selectedPhoto.coords.longitude.toFixed(4)}`;
-                      const resolvedName = locationNames.get(key);
-                      return resolvedName || `${selectedPhoto.coords.latitude.toFixed(4)}, ${selectedPhoto.coords.longitude.toFixed(4)}`;
-                    })()}
+                {/* Informations de la photo */}
+                <View style={styles.photoModalInfo}>
+                  <Text style={styles.photoModalDate}>
+                    📅 {new Date(selectedPhoto.date?.seconds * 1000 || selectedPhoto.date).toLocaleDateString()}
                   </Text>
-                )}
-              </View>
-            </View>
-          )}
-        </SafeAreaView>
+                  {selectedPhoto.coords && (
+                    <Text style={styles.photoModalLocation}>
+                      📍 {(() => {
+                        const key = `${selectedPhoto.coords.latitude.toFixed(4)},${selectedPhoto.coords.longitude.toFixed(4)}`;
+                        const resolvedName = locationNames.get(key);
+                        return resolvedName || `${selectedPhoto.coords.latitude.toFixed(4)}, ${selectedPhoto.coords.longitude.toFixed(4)}`;
+                      })()}
+                    </Text>
+                  )}
+                </View>
+              </>
+            )}
+          </View>
+        </View>
       </Modal>
 
       {/* Modal pour le select des lieux */}

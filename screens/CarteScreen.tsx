@@ -11,7 +11,6 @@ import {
 } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { Ionicons } from '@expo/vector-icons';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { db } from '../services/firebase';
 import { useAuth } from '../services/auth';
@@ -290,26 +289,40 @@ export default function CarteScreen() {
         <Ionicons name="locate" size={24} color="#007AFF" />
       </TouchableOpacity>
 
-      <Modal visible={showModal} animationType="fade" onRequestClose={() => setShowModal(false)}>
-        <SafeAreaView style={styles.modalContainer}>
-          <TouchableOpacity style={styles.closeButton} onPress={() => setShowModal(false)}>
-            <Ionicons name="close" size={30} color="#fff" />
-          </TouchableOpacity>
+      <Modal visible={showModal} animationType="fade" transparent={true} onRequestClose={() => setShowModal(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.photoModal}>
+            <TouchableOpacity
+              style={styles.closeButtonCompact}
+              onPress={() => setShowModal(false)}
+            >
+              <Ionicons name="close" size={24} color="#fff" />
+            </TouchableOpacity>
 
-          {selectedPhoto && (
-            <View style={styles.modalContent}>
-              <Image source={{ uri: selectedPhoto.imageUrl }} style={styles.modalImage} resizeMode="contain" />
-              <View style={styles.photoInfo}>
-                <Text style={styles.photoDate}>
-                  {new Date(selectedPhoto.date?.seconds ? selectedPhoto.date.seconds * 1000 : selectedPhoto.date || Date.now()).toLocaleDateString()}
-                </Text>
-                <Text style={styles.photoLocation}>
-                  📍 {Number(selectedPhoto.coords.latitude).toFixed(4)}, {Number(selectedPhoto.coords.longitude).toFixed(4)}
-                </Text>
-              </View>
-            </View>
-          )}
-        </SafeAreaView>
+            {selectedPhoto && (
+              <>
+                {/* Image compacte */}
+                <View style={styles.photoModalContent}>
+                  <Image
+                    source={{ uri: selectedPhoto.imageUrl }}
+                    style={styles.photoModalImage}
+                    resizeMode="cover"
+                  />
+                </View>
+
+                {/* Informations de la photo */}
+                <View style={styles.photoModalInfo}>
+                  <Text style={styles.photoModalDate}>
+                    📅 {new Date(selectedPhoto.date?.seconds ? selectedPhoto.date.seconds * 1000 : selectedPhoto.date || Date.now()).toLocaleDateString()}
+                  </Text>
+                  <Text style={styles.photoModalLocation}>
+                    📍 {Number(selectedPhoto.coords.latitude).toFixed(4)}, {Number(selectedPhoto.coords.longitude).toFixed(4)}
+                  </Text>
+                </View>
+              </>
+            )}
+          </View>
+        </View>
       </Modal>
     </View>
   );
@@ -330,4 +343,66 @@ const styles = StyleSheet.create({
   photoInfo:{ position:'absolute', bottom:50, left:20, right:20, backgroundColor:'rgba(0,0,0,.7)', borderRadius:10, padding:15 },
   photoDate:{ color:'#fff', fontSize:16, fontWeight:'bold', marginBottom:5 },
   photoLocation:{ color:'#fff', fontSize:14 },
+  // Nouveaux styles pour le modal compact
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  photoModal: {
+    width: '100%',
+    maxWidth: 500,
+    backgroundColor: '#000',
+    borderRadius: 20,
+    padding: 16,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 10,
+    },
+    shadowOpacity: 0.5,
+    shadowRadius: 20,
+    elevation: 20,
+  },
+  closeButtonCompact: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    borderRadius: 16,
+    width: 32,
+    height: 32,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 10,
+  },
+  photoModalContent: {
+    width: '100%',
+    alignItems: 'center',
+  },
+  photoModalImage: {
+    width: '100%',
+    height: 400,
+    borderRadius: 12,
+  },
+  photoModalInfo: {
+    width: '100%',
+    marginTop: 16,
+    paddingHorizontal: 8,
+  },
+  photoModalDate: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  photoModalLocation: {
+    color: '#fff',
+    fontSize: 14,
+    textAlign: 'center',
+    opacity: 0.9,
+  },
 });
