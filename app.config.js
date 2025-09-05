@@ -20,7 +20,15 @@ export default {
       supportsTablet: true,
       infoPlist: {
         NSCameraUsageDescription: "Cette app utilise la caméra pour prendre des photos de vos voyages.",
-        NSLocationWhenInUseUsageDescription: "Cette app utilise votre position pour géolocaliser vos photos."
+        NSLocationWhenInUseUsageDescription: "Cette app utilise votre position pour géolocaliser vos photos.",
+        NSLocationAlwaysAndWhenInUseUsageDescription: "Cette app utilise votre position en continu pour géolocaliser vos photos.",
+        NSLocationAlwaysUsageDescription: "Cette app utilise votre position en arrière-plan pour géolocaliser vos photos.",
+        NSPhotoLibraryUsageDescription: "Cette app accède à votre bibliothèque photos pour sauvegarder vos images.",
+        NSLocationTemporaryUsageDescriptionDictionary: {
+          "AppUsesLocationForPhotoGeotagging": "Pour géolocaliser vos photos de voyage"
+        },
+        UIBackgroundModes: ["location", "fetch"],
+        NSLocationDefaultAccuracyReduced: false
       }
     },
     android: {
@@ -45,8 +53,8 @@ export default {
       [
         'expo-splash-screen',
         {
-          image: './assets/images/splash-icon.png',
-          imageWidth: 200,
+          image: './assets/icon.jpg',
+          imageWidth: 350,
           resizeMode: 'contain',
           backgroundColor: '#ffffff'
         }

@@ -1,0 +1,15 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Règles temporaires pour la migration - À SUPPRIMER APRÈS MIGRATION
+    match /users/{userId} {
+      allow read, write: if true;
+    }
+    match /photos/{photoId} {
+      allow read, write: if true;
+    }
+    match /{document=**} {
+      allow read, write: if true;
+    }
+  }
+}
