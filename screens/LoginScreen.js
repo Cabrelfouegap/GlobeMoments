@@ -91,6 +91,7 @@ export default function LoginScreen() {
                 value={name}
                 onChangeText={setName}
                 autoCapitalize="words"
+                placeholderTextColor="#666"
               />
             </View>
           )}
@@ -104,6 +105,7 @@ export default function LoginScreen() {
               onChangeText={setEmail}
               keyboardType="email-address"
               autoCapitalize="none"
+              placeholderTextColor="#666"
             />
           </View>
 
@@ -115,6 +117,7 @@ export default function LoginScreen() {
               value={password}
               onChangeText={setPassword}
               secureTextEntry
+              placeholderTextColor="#666"
             />
           </View>
 

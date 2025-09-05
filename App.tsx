@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -10,6 +10,9 @@ import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 // Import des services
 import { AuthProvider, useAuth } from './services/auth';
 import { ThemeProvider, useTheme } from './services/ThemeContext';
+
+// Import des composants
+import SplashScreenComponent from './components/SplashScreen';
 
 // Import des écrans
 import LoginScreen from './screens/LoginScreen';
@@ -28,6 +31,15 @@ const Tab = createBottomTabNavigator();
 function AppNavigator() {
   const { user, loading } = useAuth();
   const { theme, isLoading: themeLoading } = useTheme();
+  const [isSplashVisible, setIsSplashVisible] = React.useState(true);
+
+  const handleSplashFinish = () => {
+    setIsSplashVisible(false);
+  };
+
+  if (isSplashVisible) {
+    return <SplashScreenComponent onFinish={handleSplashFinish} />;
+  }
 
   if (loading || themeLoading) {
     return (

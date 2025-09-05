@@ -4,7 +4,7 @@
     "slug": "GlobeMoments",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/icon.jpg",
     "scheme": "globemoments",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
@@ -30,7 +30,7 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/adaptive-icon.png",
+        "foregroundImage": "./assets/icon.jpg",
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
@@ -53,14 +53,14 @@
     "web": {
       "bundler": "metro",
       "output": "static",
-  "favicon": "./assets/images/favicon.png"
+  "favicon": "./assets/icon.jpg"
     },
     "plugins": [
       [
         "expo-splash-screen",
         {
           "backgroundColor": "#007AFF",
-          "image": "./assets/splash.jpg",
+          "image": "./assets/icon.jpg",
           "imageWidth": 150,
           "resizeMode": "contain"
         }

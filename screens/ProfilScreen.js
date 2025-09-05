@@ -494,6 +494,7 @@ export default function ProfilScreen() {
               onChangeText={setCurrentPassword}
               placeholder="Entrez votre mot de passe actuel"
               secureTextEntry={true}
+              placeholderTextColor="#666"
             />
 
             <Text style={styles.inputLabel}>Nouveau mot de passe</Text>
@@ -503,6 +504,7 @@ export default function ProfilScreen() {
               onChangeText={setNewPassword}
               placeholder="Entrez votre nouveau mot de passe"
               secureTextEntry={true}
+              placeholderTextColor="#666"
             />
 
             <Text style={styles.inputLabel}>Confirmer le nouveau mot de passe</Text>
@@ -512,6 +514,7 @@ export default function ProfilScreen() {
               onChangeText={setConfirmPassword}
               placeholder="Confirmez votre nouveau mot de passe"
               secureTextEntry={true}
+              placeholderTextColor="#666"
             />
 
             <View style={styles.modalButtons}>
@@ -555,6 +558,7 @@ export default function ProfilScreen() {
               placeholder="Entrez votre nouvelle adresse email"
               keyboardType="email-address"
               autoCapitalize="none"
+              placeholderTextColor="#666"
             />
 
             <Text style={styles.inputLabel}>Mot de passe actuel</Text>
@@ -564,6 +568,7 @@ export default function ProfilScreen() {
               onChangeText={setEmailPassword}
               placeholder="Entrez votre mot de passe actuel"
               secureTextEntry={true}
+              placeholderTextColor="#666"
             />
 
             <View style={styles.modalButtons}>
@@ -651,6 +656,7 @@ export default function ProfilScreen() {
               onChangeText={setEditName}
               placeholder="Entrez votre nom"
               maxLength={50}
+              placeholderTextColor="#666"
             />
 
             <View style={styles.modalButtons}>
